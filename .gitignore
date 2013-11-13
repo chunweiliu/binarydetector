@@ -1,0 +1,4 @@
+*~
+*.swp
+VOCdevkit/VOC2007/*
+!VOCdevkit/VOC2007/PUT_VOC2007_DATA_HERE
