@@ -1,4 +1,4 @@
-function model = pascal_train(cls, n)
+function model = pascal_train(cls)%, n)
 
 % model = pascal_train(cls)
 % Train a model using the PASCAL dataset.

@@ -30,6 +30,7 @@ catch
       pos(numpos).y1 = bbox(2);
       pos(numpos).x2 = bbox(3);
       pos(numpos).y2 = bbox(4);
+      pos(numpos).id = ids{i};
     end
   end
 
@@ -46,6 +47,7 @@ catch
     if length(clsinds) == 0
       numneg = numneg+1;
       neg(numneg).im = [VOCopts.datadir rec.imgname];
+      neg(numneg).id = ids{i};
     end
   end
   

@@ -11,3 +11,18 @@ mex -O ./gdetect/fconvblas.cc -lmwblas -o ./bin/fconv
 % mex -O fconvMT.cc -o fconv
 % 3) basic convolution, very compatible
 % mex -O fconv.cc -o fconv
+
+% setup the environment
+curDir = pwd;
+dependDir = sprintf('%s/3rdparty', curDir);
+mkdir(dependDir);
+
+% download and compile liblinear (only work on linux)
+% liblinear
+cd(dependDir);
+display('Downloading LIBLINEAR...');
+cmd = 'wget http://www.csie.ntu.edu.tw/~cjlin/liblinear/liblinear-1.94.tar.gz; tar -xvf liblinear-1.94.tar.gz; rm -f liblinear-1.94.tar.gz;';
+unix(cmd);
+cd('liblinear-1.94/matlab');
+make;
+cd(curDir);

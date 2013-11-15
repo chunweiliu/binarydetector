@@ -1,24 +1,17 @@
-function model = train(name, model, pos, neg )
+function model = train(name, model, pos, neg)
 
 % model = train(name, model, pos, neg)
 % Train LSVM. (For now it's just an SVM)
 % 
 
 % SVM learning parameters
-C = 0.002*model.numcomponents;
-J = 1;
+%C = 0.002*model.numcomponents;
+%J = 1;
 
 maxsize = 2^28;
 
 globals;
-hdrfile = [tmpdir name '.hdr'];
-datfile = [tmpdir name '.dat'];
-modfile = [tmpdir name '.mod'];
-inffile = [tmpdir name '.inf'];
-lobfile = [tmpdir name '.lob'];
-
-labelsize = 5;  % [label id level x y]
-negpos = 0;     % last position in data mining
+pascal_init;
 
 % approximate bound on the number of examples used in each iteration
 dim = 0;
@@ -27,57 +20,122 @@ for i = 1:model.numcomponents
 end
 maxnum = floor(maxsize / (dim * 4));
 
-% Reset some of the tempoaray files, just in case
-% reset data file
-fid = fopen(datfile, 'wb');
-fclose(fid);
-% reset header file
-writeheader(hdrfile, 0, labelsize, model);  
-% reset info file
-fid = fopen(inffile, 'w');
-fclose(fid);
-% reset initial model 
-fid = fopen(modfile, 'wb');
-fwrite(fid, zeros(sum(model.blocksizes), 1), 'double');
-fclose(fid);
-% reset lower bounds
-writelob(lobfile, model)
 
-
-% Find the positive examples and safe them in the data file
-fid = fopen(datfile, 'w');
-num = poswarp(name, model, 1, pos, fid);
+% Find the positive examples and save them in the data file
+[posdata, posids, numpos] = poswarp(name, model, 1, pos);
 
 % Add random negatives
-num = num + negrandom(name, model, 1, neg, maxnum-num, fid);
-fclose(fid);
-        
-% learn model
-writeheader(hdrfile, num, labelsize, model);
-% reset initial model 
-fid = fopen(modfile, 'wb');
-fwrite(fid, zeros(sum(model.blocksizes), 1), 'double');
-fclose(fid);
+[negdata, negids, numneg] = negrandom(name, model, 1, neg, maxnum-numpos);
 
+data = [posdata negdata]';
+labels = [ones(numpos,1); -ones(numneg,1)];
+ids = [posids; negids];
+
+
+        
 % Call the SVM learning code
-cmd = sprintf('./bin/learn %.4f %.4f %s %s %s %s %s', ...
-              C, J, hdrfile, datfile, modfile, inffile, lobfile);
-fprintf('executing: %s\n', cmd);
-status = unix(cmd);
-if status ~= 0
-  fprintf('command `%s` failed\n', cmd);
-  keyboard;
+% --- cross validation
+k = 3;
+cvids = wl_cvIds(ids, labels, k);
+
+bestparams.c = [];
+
+cs = [0.01 0.1 1 10 100];
+for ci=1:length(cs)
+    c = cs(ci);
+    for ii=1:k
+        
+        % for each validation set
+        valids = cvids{ii};
+        trainids = [];
+        for jj=1:k
+            if jj~=i
+                trainids = [trainids; cvids{jj}];
+            end
+        end
+        
+        % liblinear train
+        w1 = sqrt(sum(labels(trainids)~=1)/sum(labels(trainids)==1));
+        op = sprintf('-s 3 -c %f -w1 %f -w-1 1 -B 1', c, w1);
+        linearmodel = lineartrain(labels(trainids), sparse(data(trainids,:)), op);
+        
+        % liblinear predict
+        op = sprintf('-b 0');
+        [~,~,vals] = linearpredict(labels(valids), sparse(data(valids,:)), linearmodel, op);
+        unique = ones(size(vals,1),1);
+        
+        % --- update model.rootfilters{1}.w
+        % compute threshold for high recall
+        P = find((labels(valids) == 1) .* unique);
+        pos_vals = sort(vals(P));
+        model.thresh = pos_vals(ceil(length(pos_vals)*0.05));
+        model.rootfilters{1}.w = reshape(linearmodel.w(1:end-1)...
+            ,size(model.rootfilters{1}.w));
+        
+        
+        % --- perform detection
+        % pascal_eval is limit to evaluate 'train', 'trainval', or 'test'.
+        % here we need to evaluate a subset of trainval, need to rewrite
+        % the code.
+        boxes = cell(length(valids),1);
+        for i = 1:length(valids)
+            fprintf('%s: detect for val: %s %s, %d/%d\n', cls, 'valtmp', VOCyear, ...
+                i, length(valids));
+            im = imread(sprintf(VOCopts.imgpath, ids{valids(i)}));  
+            b = detect(im, model, model.thresh); %need nmx...
+            if ~isempty(b)
+                b1 = b(:,[1 2 3 4 end]);
+                b1 = clipboxes(im, b1);
+                boxes{i} = nms(b1, 0.5);
+            else
+                boxes{i} = [];
+            end
+        end
+     
+        
+        % --- compute AP        
+        % write out detections in PASCAL format and score
+        fid = fopen(sprintf(VOCopts.detrespath, 'valtmp', cls), 'w');
+        for i = 1:length(valids);
+            bbox = boxes{i};
+            for j = 1:size(bbox,1)
+                fprintf(fid, '%s %f %d %d %d %d\n', ids{valids(i)}, bbox(j,end), bbox(j,1:4));
+            end
+        end
+        fclose(fid);
+        % get AP
+        [recall, prec, ap] = evaldet(VOCopts, 'valtmp', cls, true, ids(valids));
+        fprintf('%s AP: %f (c: %f)\n', cls, ap, c);
+        if ap > bestap
+            bestap = ap;
+            bestparams.c = c;
+        end
+      
+    end
 end
+
+
+
     
+% --- get labels, vals (w*x+b), unique (all ones?)
 fprintf('parsing model\n');
-blocks = readmodel(modfile, model);
-model = parsemodel(model, blocks);
-[labels, vals, unique] = readinfo(inffile);
+%blocks = readmodel(modfile, model);
+%model = parsemodel(model, blocks);
+%[labels, vals, unique] = readinfo(inffile);
     
-% compute threshold for high recall
-P = find((labels == 1) .* unique);
-pos_vals = sort(vals(P));
-model.thresh = pos_vals(ceil(length(pos_vals)*0.05));
+
+
+
+% --- compute AP
+%  for each val image
+%  b = detect(im, model, thresh)
+
+%  because pascal_test and pascal_eavl's id is one-to-one map
+%  they don't need to remeber the id, but we need to know the
+%  id information in val set
+
+% ---------------------------------
+
 
 % cache model
 save([cachedir name '_model'], 'model');
@@ -85,19 +143,15 @@ save([cachedir name '_model'], 'model');
 
 % get positive examples by warping positive bounding boxes
 % we create virtual examples by flipping each image left to right
-function num = poswarp(name, model, c, pos, fid)
+function [data, ids, num]= poswarp(name, model, c, pos)
 numpos = length(pos);
 warped = warppos(name, model, c, pos);
 ridx = model.components{c}.rootindex;
-oidx = model.components{c}.offsetindex;
-rblocklabel = model.rootfilters{ridx}.blocklabel;
-oblocklabel = model.offsets{oidx}.blocklabel;
-dim = model.components{c}.dim;
-width1 = ceil(model.rootfilters{ridx}.size(2)/2);
-width2 = floor(model.rootfilters{ridx}.size(2)/2);
 pixels = model.rootfilters{ridx}.size * model.sbin;
 minsize = prod(pixels);
 num = 0;
+data = zeros(numel(model.rootfilters{1}.w), 2*numpos); % column major faster
+ids = cell(2*numpos, 1);
 for i = 1:numpos
     if mod(i,100)==0
         fprintf('%s: warped positive: %d/%d\n', name, i, numpos);
@@ -109,37 +163,29 @@ for i = 1:numpos
     end    
     % get example
     im = warped{i};
-    feat = features(im, model.sbin);
-    feat(:,1:width2,:) = feat(:,1:width2,:) + flipfeat(feat(:,width1+1:end,:));
-    feat = feat(:,1:width1,:);
-    fwrite(fid, [1 2*i-1 0 0 0 2 dim], 'int32');
-    fwrite(fid, [oblocklabel 1], 'single');
-    fwrite(fid, rblocklabel, 'single');
-    fwrite(fid, feat, 'single');    
+    feat = features(im, model.sbin); % size(feat)=(size(im)/8)-2
+    data(:,1+num) = feat(:);
+    ids(1+num) = {pos(i).id};
+    
     % get flipped example
     feat = features(im(:,end:-1:1,:), model.sbin);    
-    feat(:,1:width2,:) = feat(:,1:width2,:) + flipfeat(feat(:,width1+1:end,:));
-    feat = feat(:,1:width1,:);
-    fwrite(fid, [1 2*i 0 0 0 2 dim], 'int32');
-    fwrite(fid, [oblocklabel 1], 'single');
-    fwrite(fid, rblocklabel, 'single');
-    fwrite(fid, feat, 'single');
+    data(:,2+num) = feat(:);
+    ids(2+num) = {pos(i).id};
+    
     num = num+2;    
 end
+data = data(:,1:num);
+ids = ids(1:num);
 
 % get random negative examples
-function num = negrandom(name, model, c, neg, maxnum, fid)
+function [data, ids, num] = negrandom(name, model, c, neg, maxnum)
 numneg = length(neg);
 rndneg = floor(maxnum/numneg);
 ridx = model.components{c}.rootindex;
-oidx = model.components{c}.offsetindex;
-rblocklabel = model.rootfilters{ridx}.blocklabel;
-oblocklabel = model.offsets{oidx}.blocklabel;
 rsize = model.rootfilters{ridx}.size;
-width1 = ceil(rsize(2)/2);
-width2 = floor(rsize(2)/2);
-dim = model.components{c}.dim;
 num = 0;
+data = zeros(numel(model.rootfilters{1}.w), numneg*rndneg);
+ids = cell(numneg*rndneg,1);
 for i = 1:numneg
   if mod(i,100)==0
     fprintf('%s: random negatives: %d/%d\n', name, i, numneg);
@@ -151,14 +197,82 @@ for i = 1:numneg
       x = random('unid', size(feat,2)-rsize(2)+1);
       y = random('unid', size(feat,1)-rsize(1)+1);
       f = feat(y:y+rsize(1)-1, x:x+rsize(2)-1,:);
-      f(:,1:width2,:) = f(:,1:width2,:) + flipfeat(f(:,width1+1:end,:));
-      f = f(:,1:width1,:);
-      fwrite(fid, [-1 (i-1)*rndneg+j 0 0 0 2 dim], 'int32');
-      fwrite(fid, [oblocklabel 1], 'single');
-      fwrite(fid, rblocklabel, 'single');
-      fwrite(fid, f, 'single');
+      data(:,rndneg*(i-1)+j) = f(:);
+      ids(rndneg*(i-1)+j) = {neg(i).id};
     end
     num = num+rndneg;
   end
 end
 
+function cvIds = wl_cvIds(ids, labels, k)
+% wl_cvIds() will partition the labels into k parts with equally
+% number of images
+% Input:
+%	ids: the image name for all the features
+%	labels: the label for all the features
+%	k: the number of partitions
+%
+% Output:
+%   trai
+
+% step 1: hash the image names
+hash = VOChash_init(ids);
+
+% step 2: get the unique name of the images
+imgNames = unique(ids);
+
+% step 2.1: get the positive image names
+posImgNames = unique(ids(labels==1));
+nPosImgs = length(posImgNames);
+
+% step 2.2: get the negative image names
+negImgNames = setdiff(imgNames, posImgNames);
+nNegImgs = length(negImgNames);
+
+% step 3: randomly split the positive image names
+if nPosImgs ~= 0
+    % step 3.1: randomly permute the postive image names
+    posImgNames = posImgNames(randperm(nPosImgs));
+    % step 3.2: split the image names into k parts
+    n = floor(nPosImgs/k);
+    count = 0;
+    i = 1;
+    cvIds{i} = [];
+    for d=1:nPosImgs
+        imgName = posImgNames{d};
+        count = count + 1;
+        % step 4.1: get the indices for the image name
+        idx = VOChash_lookup(hash, imgName);
+        if count < n || i==k
+            cvIds{i} = [cvIds{i}; idx'];
+        else
+            cvIds{i} = [cvIds{i}; idx'];
+            i = i+1;
+            count = 0;
+            cvIds{i} = [];
+        end
+    end
+end
+
+% step 4: randomly split the negative image names
+if nNegImgs ~= 0
+    % step 4.1: randomly permute the negative image names
+    negImgNames = negImgNames(randperm(nNegImgs));
+    % step 3.2: split the image names into k parts
+    n = floor(nNegImgs/k);
+    count = 0;
+    i = 1;
+    for d=1:nNegImgs
+        imgName = negImgNames{d};
+        count = count + 1;
+        % step 4.1: get the indices for the image name
+        idx = VOChash_lookup(hash, imgName);
+        if count < n || i==k
+            cvIds{i} = [cvIds{i}; idx'];
+        else
+            cvIds{i} = [cvIds{i}; idx'];
+            i = i+1;
+            count = 0;
+        end
+    end
+end

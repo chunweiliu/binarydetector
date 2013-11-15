@@ -27,10 +27,11 @@ switch VOCyear
 end
 
 % add path
-addpath('./bin')
-addpath('./features')
-addpath('./gdetect')
-addpath('./io')
-addpath('./test')
-addpath('./train')
-addpath('./vis')
+addpath('bin')
+addpath('features')
+addpath('gdetect')
+addpath('io')
+addpath('test')
+addpath('train')
+addpath('vis')
+addpath('3rdparty/liblinear-1.94/matlab/')
