@@ -79,8 +79,11 @@ for ci=1:length(cs)
         P = find((labels(bvalids) == 1) .* unique);
         pos_vals = sort(vals(P));
         model.thresh = pos_vals(ceil(length(pos_vals)*0.05));
+        
+        % update the filter
         model.rootfilters{1}.w = reshape(linearmodel.w(1:end-1),... % no bias term
             size(model.rootfilters{1}.w));
+        model.offsets{1}.w = linearmodel.w(end);
         
         
         % --- perform detection on each image (not box)
@@ -122,6 +125,7 @@ for ci=1:length(cs)
         % get AP
         [recall, prec, apii] = evaldet(VOCopts, 'valtmp', name, true, valimage);
         ap = ap + apii;
+        fprintf('%s AP (part): %f (c: %f)\n', name, apii, c);
     end 
     
     ap = ap / k;
