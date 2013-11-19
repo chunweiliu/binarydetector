@@ -25,7 +25,7 @@ else
     maxnum = floor(maxsize / (dim * 4));
     
     
-    % Find the positive examples and save them in the data file
+    % Find the positive examples
     [posdata, posids, numpos] = poswarp(name, model, 1, pos);
     
     % Add random negatives
@@ -35,6 +35,7 @@ else
     labels = [ones(numpos,1); -ones(numneg,1)];
     ids = [posids; negids];
  
+    % Save them in the data file
     save(datafile, 'data', 'labels', 'ids');
 end
 
@@ -42,7 +43,7 @@ end
 % Call the SVM learning code
 % --- cross validation
 k = 3;
-[cvids imname] = wl_cvIds(ids, labels, k);
+[cvids, imname] = wl_cvIds(ids, labels, k);
 
 bestap = 0;
 bestparams.c = [];
@@ -71,14 +72,14 @@ for ci=1:length(cs)
         % liblinear predict
         op = sprintf('-b 0');
         [~,~,vals] = predict(labels(bvalids), sparse(data(bvalids,:)), linearmodel, op);
-        unique = ones(size(vals,1),1);
+        unique = ones(size(vals,1),1); % pretend all data are unique
         
         % --- update model.rootfilters{1}.w
         % compute threshold for high recall
         P = find((labels(bvalids) == 1) .* unique);
         pos_vals = sort(vals(P));
         model.thresh = pos_vals(ceil(length(pos_vals)*0.05));
-        model.rootfilters{1}.w = reshape(linearmodel.w(1:end-1),...
+        model.rootfilters{1}.w = reshape(linearmodel.w(1:end-1),... % no bias term
             size(model.rootfilters{1}.w));
         
         
@@ -148,6 +149,10 @@ pos_vals = sort(vals(P));
 model.thresh = pos_vals(ceil(length(pos_vals)*0.05));
 model.rootfilters{1}.w = reshape(linearmodel.w(1:end-1),...
     size(model.rootfilters{1}.w));
+
+% cache model
+save([cachedir name '_model'], 'model');
+
 
 
 % get positive examples by warping positive bounding boxes
