@@ -153,6 +153,7 @@ pos_vals = sort(vals(P));
 model.thresh = pos_vals(ceil(length(pos_vals)*0.05));
 model.rootfilters{1}.w = reshape(linearmodel.w(1:end-1),...
     size(model.rootfilters{1}.w));
+model.offsets{1}.w = linearmodel.w(end);
 
 % cache model
 save([cachedir name '_model'], 'model');
