@@ -85,6 +85,7 @@ model.rootfilters{1}.w = zeros([model.rootfilters{1}.size 31]);
 height = model.rootfilters{1}.size(1);
 % root filter is symmetric
 width = ceil(model.rootfilters{1}.size(2)/2);
+%width = model.rootfilters{1}.size(2);
 model.rootfilters{1}.blocklabel = 2;
 model.blocksizes(2) = width * height * 31;
 model.regmult(2) = 1;

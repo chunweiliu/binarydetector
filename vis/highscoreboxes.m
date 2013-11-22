@@ -27,12 +27,12 @@ topboxes = allboxes(sortedidx(1:k),:);
 topboxesids = boxesid(sortedidx(1:k));
 
 for i = 1:k
-    figure(i)
+    %figure(i) 
     im = imread(sprintf(VOCopts.imgpath, ids{topboxesids(i)}));
     showboxes(im, topboxes(i,:));
-    
     text(topboxes(i,1)+2,topboxes(i,2)+9,num2str(topscores(i)),...
         'BackgroundColor','red');
+    saveas(gcf, sprintf('html/images/%s_%s_%s_%03d.png', cls, testset, suffix, i), 'png');
 end
 
 end
