@@ -8,5 +8,5 @@ VOCdevkit/VOC2007/*
 VOCdevkit/results
 voccache
 !voccache/dummy
-html
-!html/html_highscoreboxes.m
+html/*
+!html/*.m
