@@ -10,3 +10,5 @@ voccache
 !voccache/dummy
 html/*
 !html/*.m
+*.png
+*.fig

@@ -26,3 +26,5 @@ unix(cmd);
 cd('liblinear-1.94/matlab');
 make;
 cd(curDir);
+
+% download and compile libsvm

@@ -11,7 +11,8 @@ try
   load([cachedir cls '_random']);
 catch
   model = initmodel(pos);
-  model = trainroot(cls, model, pos, neg);
+  model = train(cls, model, pos, neg);
+  %model = trainroot(cls, model, pos, neg);
   %model = trainhard(cls, model, pos, neg);
   save([cachedir cls '_random'], 'model');
 end

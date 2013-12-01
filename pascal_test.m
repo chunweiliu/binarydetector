@@ -10,7 +10,7 @@ ids = textread(sprintf(VOCopts.imgsetpath, testset), '%s');
 
 % run detector in each image
 try
-  load([cachedir cls '_boxes_' testset '_' suffix]);
+  load([cachedir cls '1_boxes_' testset '_' suffix]);
 catch
   for i = 1:length(ids);
     fprintf('%s: testing: %s %s, %d/%d\n', cls, testset, VOCyear, ...

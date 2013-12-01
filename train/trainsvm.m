@@ -1,31 +1,23 @@
-function model = trainlinear(labels, data, params, model)
+function model = trainsvm(labels, data, params, model)
 
 % linearmodel = trainlinear(labels, data, params)
 % try to train the linear model
 
 % setting
-svmop = '-s 3 -c %f -w1 %f -w-1 %f -B 1';
+svmop = '-t 0 -c %f -w1 %f -w-1 %f -h 0'; % svm
+
     
 % train on the subset
 wp = sqrt(sum(labels~=1)/sum(labels==1));
 wn = 1;
 
-% nw = ones(length(labels), 1);
-% nw(labels==1) = w1;
-% nw = nw / norm(nw, 2);
-% 
-% a = unique(nw);
-% wp = max(a);
-% wn = min(a);
-
-
-
 op = sprintf(svmop, params.c, wp, wn);
-linearmodel = train(labels, sparse(data), op);
+linearmodel = svmtrain(labels, data, op);
+
 
 % predict all
 op = sprintf('-b 0');
-[~,~,vals] = predict(labels, sparse(data), linearmodel, op);
+[~,~,vals] = svmpredict(labels, data, linearmodel, op);
 
 
 % compute threshold for high recall
@@ -37,14 +29,13 @@ pos_vals = sort(vals(P));
 model.thresh = pos_vals(ceil(length(pos_vals)*0.05));
 
 % update the filter of model
-w = linearmodel.w(1:end-1);
-b = linearmodel.w(end);
+w = linearmodel.SVs' * linearmodel.sv_coef;
+b = -linearmodel.rho;
 
 if linearmodel.Label(1) == -1
   w = -w;
   b = -b;
 end
-
 blocks{1} = b;
 blocks{2} = w;
 model = parsemodel(model, blocks);

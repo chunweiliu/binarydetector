@@ -44,6 +44,8 @@ model.wta.params.iswta = 0;
 
 % train the final model based on the best parameters
 model = trainlinear(labels, data, params, model);
+%model = retrain(labels, data, params, model);
+%model = trainsvm(labels, data, params, model);
 
 
 

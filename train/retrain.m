@@ -5,8 +5,8 @@ function model = retrain(labels, data, params, model)
 
 % setting
 svmop = '-s 3 -c %f -w1 %f -w-1 1 -B 1';
-ndatamine = 1;
-initratio = 1;
+ndatamine = 2;
+initratio = 2;
 
 % train the model using the subset of data in the first time
 pos = find(labels == 1);
@@ -22,10 +22,9 @@ for datamine = 1:ndatamine
     
     % predict all
     op = sprintf('-b 0');
-    [~,~,vals] = predict(labels(neg), sparse(data(neg,:)), linearmodel, op);
+    [~,~,vals] = predict(labels, sparse(data), linearmodel, op);
     
     % distinguish the hard and the easy examples
-    %% BUG you have to prevent the good examples
     hard = find(labels.*vals < 1 | labels == 1);
     easy = find(labels.*vals > 1 & labels ~= 1); % always keep positve
     
@@ -51,6 +50,7 @@ pos_vals = sort(vals(P));
 
 % update model
 model.thresh = pos_vals(ceil(length(pos_vals)*0.05));
-model.rootfilters{1}.w = reshape(linearmodel.w(1:end-1),...
-    size(model.rootfilters{1}.w));
-model.offsets{1}.w = linearmodel.w(end);
+
+blocks{1} = linearmodel.w(end);
+blocks{2} = linearmodel.w(1:end-1);
+model = parsemodel(model, blocks);
