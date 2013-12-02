@@ -55,15 +55,15 @@ for level = interval+1:length(feat)
     
   % convolve feature maps with filters 
   featr = padarray(feat{level}, [pady padx 0], 0);
-  %if model.wta.params.iswta == 0
+  if model.wta.iswta == 0
       rootmatch = fconv(featr, rootfilters, 1, length(rootfilters));
-  %else
-      %rootmatch = wtaconv(featr, [model.maxsize(1) model.maxsize(2)], model.wta);
-  %end
+  else
+      rootmatch = wtaconv(featr, [model.maxsize(1) model.maxsize(2)], model.wta);
+  end
   
   for c = 1:model.numcomponents
     % root score + offset
-    %if model.wta.params.iswta == 0
+    %if model.wta.iswta == 0
         score = rootmatch{ridx{c}} + model.offsets{oidx{c}}.w;  
     %else
     %    score = rootmatch{ridx{c}} + model.wta.b;

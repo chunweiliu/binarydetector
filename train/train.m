@@ -25,12 +25,12 @@ tmpmodfile = [tmpdir name '.modtmp'];
 tmpinffile = [tmpdir name '.inftmp'];
 tmplobfile = [tmpdir name '.lobtmp'];
 labelsize = 5;  % [label id level x y]
+
+
 if ~exist(hdrfile, 'file') || ~exist(datfile, 'file') || ~exist(modfile, 'file') ||...
         ~exist(inffile, 'file') || ~exist(lobfile, 'file') || ~exist(datafile, 'file')
     
     
-    
-       
     % approximate bound on the number of examples used in each iteration
     dim = 0;
     for i = 1:model.numcomponents
@@ -53,6 +53,12 @@ if ~exist(hdrfile, 'file') || ~exist(datfile, 'file') || ~exist(modfile, 'file')
     labels = [ones(numpos,1); -ones(numneg,1)];
     ids = [posids; negids];
     datafile = [cachedir name '_data.mat'];
+    
+    if model.wta.iswta ~= 0
+        [data, model.wta.Theta] = ...
+            wtahash(data, model.wta.k, model.wta.m, [], model.wta.iswta);
+    end
+    
     save(datafile, 'data', 'labels', 'ids');
     
     num = numpos + numneg;
@@ -72,14 +78,14 @@ end
 % ---
 % try to find the bestC by cross-validation using different datfile
 % --- cross validation
-k = 2;
+k = 3;
 [cvids, imname] = wl_cvIds(ids, labels, k);
 
 bestap = -1;
 bestparams.c = [];
 
-%cs = [0.001 0.01 0.1 1 10 100];
-cs = 0.002;
+cs = [0.001 0.01 0.1 1 10 100];
+%cs = 0.002;
 for ci=1:length(cs)
     params.c = cs(ci);
     ap = 0;
@@ -245,7 +251,8 @@ for i = 1:numdata
         tic;
     end    
     % get example
-    feat = reshape(data(i, :), [model.rootfilters{ridx}.size(1), width1, 31]);
+    %feat = reshape(data(i, :), [model.rootfilters{ridx}.size(1), width1, 31]);
+    feat = data(i, :);
     fwrite(fid, [labels(i) i 0 0 0 2 dim], 'int32');
     fwrite(fid, [oblocklabel 1], 'single');
     fwrite(fid, rblocklabel, 'single');
@@ -290,7 +297,7 @@ for i = 1:numpos
     fwrite(fid, [1 2*i-1 0 0 0 2 dim], 'int32');
     fwrite(fid, [oblocklabel 1], 'single');
     fwrite(fid, rblocklabel, 'single');
-    fwrite(fid, feat, 'single');    
+    fwrite(fid, feat(:), 'single');    
     % get flipped example
     feat = features(im(:,end:-1:1,:), model.sbin);    
     feat(:,1:width2,:) = feat(:,1:width2,:) + flipfeat(feat(:,width1+1:end,:));
@@ -302,7 +309,7 @@ for i = 1:numpos
     fwrite(fid, [1 2*i 0 0 0 2 dim], 'int32');
     fwrite(fid, [oblocklabel 1], 'single');
     fwrite(fid, rblocklabel, 'single');
-    fwrite(fid, feat, 'single');
+    fwrite(fid, feat(:), 'single');
     num = num+2;    
 end
 data = data(:,1:num);
@@ -340,7 +347,7 @@ for i = 1:numneg
       fwrite(fid, [-1 (i-1)*rndneg+j 0 0 0 2 dim], 'int32');
       fwrite(fid, [oblocklabel 1], 'single');
       fwrite(fid, rblocklabel, 'single');
-      fwrite(fid, f, 'single');
+      fwrite(fid, f(:), 'single');
       
       data(:,rndneg*(i-1)+j) = f(:);
       ids(rndneg*(i-1)+j) = {neg(i).id};
