@@ -14,7 +14,7 @@ try
 catch
     tic;
     for i = 1:length(ids);
-        if toc > 1
+        if toc > 60
             fprintf('%s: testing: %s %s, %d/%d\n', cls, testset, VOCyear, ...
                 i, length(ids));
             tic;

@@ -147,10 +147,13 @@ for ci=1:length(cs)
         valimage = imname{ii};
         
         boxes = cell(length(valimage),1);
+        tic;
         for i = 1:length(valimage)
-            
-            fprintf('%s: detect: %s %s, %d/%d\n', name, 'valtmp', VOCyear, ...
-                i, length(valimage));
+            if toc > 60
+                fprintf('%s: detect: %s %s, %d/%d\n', name, 'valtmp', VOCyear, ...
+                    i, length(valimage));
+                tic;
+            end
             
             im = imread(sprintf(VOCopts.imgpath, valimage{i}));  
             b = detect(im, model, model.thresh);
