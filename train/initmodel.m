@@ -80,6 +80,17 @@ model.regmult(1) = 0;
 model.learnmult(1) = 20;
 model.lowerbounds{1} = -100;
 
+% wta build-in
+model.wta.iswta = 1;
+if model.wta.iswta == 1
+    %model.rootfileters{1}.size = [1 1 k*m];
+    model.wta.k = 4;
+    model.wta.m = 20;
+    %model.wta.size = [1 1 model.wta.k*model.wta.m];
+    %model.wta.size = [1 model.wta.k*model.wta.m];
+    model.wta.blocksizes = [1 model.wta.k*model.wta.m];
+end
+
 % set up root filter
 model.rootfilters{1}.w = zeros([model.rootfilters{1}.size 31]);
 height = model.rootfilters{1}.size(1);
@@ -89,13 +100,21 @@ model.rootfilters{1}.blocklabel = 2;
 model.blocksizes(2) = width * height * 31;
 model.regmult(2) = 1;
 model.learnmult(2) = 1;
-model.lowerbounds{2} = -100*ones(model.blocksizes(2),1);
+if model.wta.iswta == 1
+    model.lowerbounds{2} = -100*ones(model.wta.blocksizes(2),1);
+else
+    model.lowerbounds{2} = -100*ones(model.blocksizes(2),1);
+end
 
 % set up one component model
 model.components{1}.rootindex = 1;
 model.components{1}.offsetindex = 1;
 model.components{1}.parts = {};
-model.components{1}.dim = 2 + model.blocksizes(1) + model.blocksizes(2);
+if model.wta.iswta == 1
+    model.components{1}.dim = 2 + model.wta.blocksizes(1) + model.wta.blocksizes(2);
+else
+    model.components{1}.dim = 2 + model.blocksizes(1) + model.blocksizes(2);
+end
 model.components{1}.numblocks = 2;
 
 % initialize the rest of the model structure
@@ -106,11 +125,3 @@ model.partfilters = {};
 model.defs = {};
 model.maxsize = model.rootfilters{1}.size;
 model.minsize = model.rootfilters{1}.size;
-
-% wta build-in
-model.wta.iswta = 0;
-if model.wta.iswta ~= 0
-    model.rootfileters{1}.size = [1 1 k*m];%??
-    model.wta.k = 4;
-    model.wta.m = 20;
-end

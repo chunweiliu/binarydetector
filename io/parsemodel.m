@@ -9,14 +9,23 @@ for i = 1:length(model.rootfilters)
   width1 = ceil(s(2)/2);
   width2 = floor(s(2)/2);
   s(2) = width1;
-  f = reshape(blocks{model.rootfilters{i}.blocklabel}, s);
-  model.rootfilters{i}.w(:,1:width1,:) = f;
-  model.rootfilters{i}.w(:,width1+1:end,:) = flipfeat(f(:,1:width2,:));
+  if model.wta.iswta == 1
+      model.wta.w = blocks{model.rootfilters{i}.blocklabel};
+  else
+      f = reshape(blocks{model.rootfilters{i}.blocklabel}, s);
+      model.rootfilters{i}.w(:,1:width1,:) = f;
+      model.rootfilters{i}.w(:,width1+1:end,:) = flipfeat(f(:,1:width2,:));
+  end
 end
 
 % update offsets
 for i = 1:length(model.offsets)
-  model.offsets{i}.w = blocks{model.offsets{i}.blocklabel};
+  if model.wta.iswta == 1
+      model.wta.b = blocks{model.offsets{i}.blocklabel};
+  else
+      
+      model.offsets{i}.w = blocks{model.offsets{i}.blocklabel};
+  end
 end
 
 % update part filters and deformation models

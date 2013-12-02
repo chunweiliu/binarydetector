@@ -1,27 +1,26 @@
-function resp = wtaconv(feat, filt, wta)
+function [ rootmatch ] = wtaconv( feat, rootsize, wta )
+%WTACONV Summary of this function goes here
+%   Detailed explanation goes here
 
-% resp = wtaconv(feat, filt)
-% compute filter respond using hamming distance
+featr = size(feat,1); % size of feature map
+featc = size(feat,2);
+r = rootsize(1); % size of filter
+c = rootsize(2);
 
-x1 = wta.w;
+nr = featr-r+1;
+nc = featc-c+1;
 
-nr = size(feat,1);
-nc = size(feat,2);
-fr = size(filt,1);
-fc = size(filt,2);
-
-resp = zeros(nr-fr+1, nc-fc+1);
-for i = 1:nc-fc+1
-    for j = 1:nr-fr+1
-        x2 = reshape(feat(i:i+fr,j:j+fc,:), 1, []);
-        x2 = wtahash(x2, wta.params.k, wta.params.m, wta.params.Theta, wta.params.iswta);
-        
-        % which response is better? Hamming dist, l2 norm?
-        %resp(i,j) = sum(x1~=x2);
-        resp(i,j) = norm(x1-x2);
+rootmatch = zeros(nr, nc);
+for j = 1:nc
+    for i = 1:nr
+        f = feat(i:i+r-1, j:j+c-1, :);
+        f = reshape(f(:), 1, []);
+        d = wtahash(f, wta.k, wta.m, wta.Theta, wta.iswta);
+        rootmatch(i,j) = d*wta.w;
     end
 end
 
+rootmatch = {rootmatch};
 
 end
 

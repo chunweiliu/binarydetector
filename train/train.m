@@ -6,7 +6,7 @@ function model = train(name, model, pos, neg)
 
 % SVM learning parameters
 %C = 0.002*model.numcomponents;
-J = 1; % weight of positive data
+%J = 1; % weight of positive data
 globals;
 pascal_init;
 
@@ -32,67 +32,85 @@ if ~exist(hdrfile, 'file') || ~exist(datfile, 'file') || ~exist(modfile, 'file')
     
     
     % approximate bound on the number of examples used in each iteration
+    % dim will reduce due to wta, but we still don't want to use too many
+    % negatives.
     dim = 0;
+    if model.wta.iswta == 1
+        factor = 25;
+    else
+        factor = 1;
+    end
     for i = 1:model.numcomponents
         dim = max(dim, model.components{i}.dim);
     end
-    maxnum = floor(maxsize / (dim * 4));
+    maxnum = floor(maxsize / (dim * 4 * factor));
     
     % Reset some of the tempoaray files, just in case
     resetall(datfile, hdrfile, inffile, modfile, lobfile, labelsize, model);
     
     % Find the positive examples and safe them in the data file
-    fid = fopen(datfile, 'w');
-    [posdata, posids, numpos] = poswarp(name, model, 1, pos, fid);
+    %fid = fopen(datfile, 'w');
+    [posdata, posids, numpos] = poswarp(name, model, 1, pos);
     
     % Add random negatives
-    [negdata, negids, numneg] = negrandom(name, model, 1, neg, maxnum-numpos, fid);
-    fclose(fid);
+    [negdata, negids, numneg] = negrandom(name, model, 1, neg, maxnum-numpos);
+    %fclose(fid);
     
     data = [posdata negdata]';
     labels = [ones(numpos,1); -ones(numneg,1)];
     ids = [posids; negids];
     datafile = [cachedir name '_data.mat'];
     
-    if model.wta.iswta ~= 0
+    if model.wta.iswta == 1
+        oridata = data;
         [data, model.wta.Theta] = ...
             wtahash(data, model.wta.k, model.wta.m, [], model.wta.iswta);
+        wta = model.wta;
     end
     
-    save(datafile, 'data', 'labels', 'ids');
+    num = data2dat(name, model, 1, datfile, data, labels);
+    save(datafile, 'data', 'labels', 'ids', 'wta');
     
-    num = numpos + numneg;
+    %num = numpos + numneg;
     
     % learn model
     writeheader(hdrfile, num, labelsize, model);
     
     % reset initial model
     fid = fopen(modfile, 'wb');
-    fwrite(fid, zeros(sum(model.blocksizes), 1), 'double');
+    if model.wta.iswta == 1
+        fwrite(fid, zeros(sum(model.wta.blocksizes), 1), 'double');
+    else
+        fwrite(fid, zeros(sum(model.blocksizes), 1), 'double');
+    end
     fclose(fid);
 
 else
     load(datafile)
+    model.wta = wta;
 end
 
 % ---
 % try to find the bestC by cross-validation using different datfile
 % --- cross validation
-k = 3;
-[cvids, imname] = wl_cvIds(ids, labels, k);
+%k = 2;
+%[cvids, imname] = wl_cvIds(ids, labels, k);
+k = -1;
 
-bestap = -1;
+bestap = -inf;
 bestparams.c = [];
 
-cs = [0.001 0.01 0.1 1 10 100];
-%cs = 0.002;
+J = 1; % weight of positive example
+%cs = [0.001 0.01 0.1 1 10 100];
+cs = 0.002;
 for ci=1:length(cs)
     params.c = cs(ci);
     ap = 0;
     for ii=1:k
         
         % for each validation set
-        % ONE BUG: the validation ap is jump very serious
+        % ONE BUG: the validation ap is jump very serious (maybe the reason
+        % is data not enought)
         %bvalids = cvids{ii};
         btrainids = [];
         for jj=1:k
@@ -106,18 +124,18 @@ for ci=1:length(cs)
             labelsize, model);
         
         % set temp data for training
-        fid = fopen(tmpdatfile, 'wb');
-        fclose(fid);
-        fid = fopen(tmpdatfile, 'w');
-        num = data2dat(name, model, 1, fid, data(btrainids,:), labels(btrainids));
-        fclose(fid);
+        num = data2dat(name, model, 1, tmpdatfile, data(btrainids,:), labels(btrainids));
         
         % write header
         writeheader(tmphdrfile, num, labelsize, model);
         
         % reset initial model
         fid = fopen(tmpmodfile, 'wb');
-        fwrite(fid, zeros(sum(model.blocksizes), 1), 'double');
+        if model.wta.iswta ~= 0
+            fwrite(fid, zeros(sum(model.wta.blocksizes), 1), 'double');
+        else
+            fwrite(fid, zeros(sum(model.blocksizes), 1), 'double');
+        end
         fclose(fid);
         
         cmd = sprintf('./bin/learn %.4f %.4f %s %s %s %s %s', ...
@@ -231,14 +249,24 @@ fid = fopen(inffile, 'w');
 fclose(fid);
 % reset initial model
 fid = fopen(modfile, 'wb');
-fwrite(fid, zeros(sum(model.blocksizes), 1), 'double');
+if model.wta.iswta == 1
+    fwrite(fid, zeros(sum(model.wta.blocksizes), 1), 'double');
+else
+    fwrite(fid, zeros(sum(model.blocksizes), 1), 'double');
+end
 fclose(fid);
 % reset lower bounds
 writelob(lobfile, model)
 
 % get positive examples by warping positive bounding boxes
 % we create virtual examples by flipping each image left to right
-function numdata = data2dat(name, model, c, fid, data, labels)
+function numdata = data2dat(name, model, c, datfile, data, labels)
+% reset datfile
+fid = fopen(datfile, 'wb');
+fclose(fid);
+
+fid = fopen(datfile, 'w');
+
 numdata = size(data,1);
 ridx = model.components{c}.rootindex;
 oidx = model.components{c}.offsetindex;
@@ -261,9 +289,10 @@ for i = 1:numdata
     fwrite(fid, rblocklabel, 'single');
     fwrite(fid, feat, 'single');       
 end
+fclose(fid);
 
-
-function [data, ids, num] = poswarp(name, model, c, pos, fid)
+%function [data, ids, num] = poswarp(name, model, c, pos, fid)
+function [data, ids, num] = poswarp(name, model, c, pos)
 numpos = length(pos);
 warped = warppos(name, model, c, pos);
 ridx = model.components{c}.rootindex;
@@ -297,10 +326,10 @@ for i = 1:numpos
     data(:,1+num) = feat(:);
     ids(1+num) = {pos(i).id};
     
-    fwrite(fid, [1 2*i-1 0 0 0 2 dim], 'int32');
-    fwrite(fid, [oblocklabel 1], 'single');
-    fwrite(fid, rblocklabel, 'single');
-    fwrite(fid, feat(:), 'single');    
+    %fwrite(fid, [1 2*i-1 0 0 0 2 dim], 'int32');
+    %fwrite(fid, [oblocklabel 1], 'single');
+    %fwrite(fid, rblocklabel, 'single');
+    %fwrite(fid, feat(:), 'single');    
     % get flipped example
     feat = features(im(:,end:-1:1,:), model.sbin);    
     feat(:,1:width2,:) = feat(:,1:width2,:) + flipfeat(feat(:,width1+1:end,:));
@@ -309,10 +338,11 @@ for i = 1:numpos
     data(:,2+num) = feat(:);
     ids(2+num) = {pos(i).id};
     
-    fwrite(fid, [1 2*i 0 0 0 2 dim], 'int32');
-    fwrite(fid, [oblocklabel 1], 'single');
-    fwrite(fid, rblocklabel, 'single');
-    fwrite(fid, feat(:), 'single');
+    %fwrite(fid, [1 2*i 0 0 0 2 dim], 'int32');
+    %fwrite(fid, [oblocklabel 1], 'single');
+    %fwrite(fid, rblocklabel, 'single');
+    %fwrite(fid, feat(:), 'single');
+    
     num = num+2;    
 end
 data = data(:,1:num);
@@ -347,10 +377,10 @@ for i = 1:numneg
       f = feat(y:y+rsize(1)-1, x:x+rsize(2)-1,:);
       f(:,1:width2,:) = f(:,1:width2,:) + flipfeat(f(:,width1+1:end,:));
       f = f(:,1:width1,:);
-      fwrite(fid, [-1 (i-1)*rndneg+j 0 0 0 2 dim], 'int32');
-      fwrite(fid, [oblocklabel 1], 'single');
-      fwrite(fid, rblocklabel, 'single');
-      fwrite(fid, f(:), 'single');
+      %fwrite(fid, [-1 (i-1)*rndneg+j 0 0 0 2 dim], 'int32');
+      %fwrite(fid, [oblocklabel 1], 'single');
+      %fwrite(fid, rblocklabel, 'single');
+      %fwrite(fid, f(:), 'single');
       
       data(:,rndneg*(i-1)+j) = f(:);
       ids(rndneg*(i-1)+j) = {neg(i).id};
