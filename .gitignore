@@ -12,3 +12,4 @@ html/*
 !html/*.m
 *.png
 *.fig
+trainop.m

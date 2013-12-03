@@ -6,6 +6,6 @@ function [ap] = pascal(cls)%, n)
 globals;
 pascal_init;
 
-model = pascal_train(cls);%, n);
+model = pascal_train(cls);
 boxes = pascal_test(cls, model, 'test', VOCyear);
 ap = pascal_eval(cls, boxes, 'test', VOCyear);

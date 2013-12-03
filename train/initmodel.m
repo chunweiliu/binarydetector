@@ -1,4 +1,4 @@
-function model = initmodel(pos, sbin, size)
+function model = initmodel(pos, wta) %sbin, size)
 
 % model = initmodel(pos, sbin, size)
 % Initialize model structure.
@@ -81,13 +81,10 @@ model.learnmult(1) = 20;
 model.lowerbounds{1} = -100;
 
 % wta build-in
-model.wta.iswta = 1;
+model.wta.iswta = wta.iswta;
 if model.wta.iswta == 1
-    %model.rootfileters{1}.size = [1 1 k*m];
-    model.wta.k = 4;
-    model.wta.m = 20;
-    %model.wta.size = [1 1 model.wta.k*model.wta.m];
-    %model.wta.size = [1 model.wta.k*model.wta.m];
+    model.wta.k = wta.k;
+    model.wta.m = wta.m;
     model.wta.blocksizes = [1 model.wta.k*model.wta.m];
 end
 

@@ -10,7 +10,7 @@ for i = 1:length(model.rootfilters)
   width2 = floor(s(2)/2);
   s(2) = width1;
   if model.wta.iswta == 1
-      model.wta.w = blocks{model.rootfilters{i}.blocklabel};
+      model.wta.w = reshape(blocks{model.rootfilters{i}.blocklabel}, 1, []);
   else
       f = reshape(blocks{model.rootfilters{i}.blocklabel}, s);
       model.rootfilters{i}.w(:,1:width1,:) = f;
@@ -22,8 +22,7 @@ end
 for i = 1:length(model.offsets)
   if model.wta.iswta == 1
       model.wta.b = blocks{model.offsets{i}.blocklabel};
-  else
-      
+  else 
       model.offsets{i}.w = blocks{model.offsets{i}.blocklabel};
   end
 end

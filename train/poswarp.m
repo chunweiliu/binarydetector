@@ -14,11 +14,9 @@ num = 0;
 
 data = zeros(prod([model.rootfilters{ridx}.size(1) width1 31]), 2*numpos); % column major faster
 ids = cell(2*numpos, 1);
-tic;
 for i = 1:numpos
-    if toc > 1
+    if mod(i,100) == 0
         fprintf('%s: warped positive: %d/%d\n', name, i, numpos);
-        tic;
     end
     bbox = [pos(i).x1 pos(i).y1 pos(i).x2 pos(i).y2];
     % skip small examples

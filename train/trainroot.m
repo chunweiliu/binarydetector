@@ -14,15 +14,19 @@ globals;
 pascal_init;
 
 datafile = [cachedir name '_data.mat'];
-if exist(datafile, 'file')
-    load(datafile)
-else
+if ~exist(datafile, 'file')
+    
     % approximate bound on the number of examples used in each iteration
     dim = 0;
+    if model.wta.iswta == 1
+        factor = 25;
+    else
+        factor = 1;
+    end
     for i = 1:model.numcomponents
         dim = max(dim, model.components{i}.dim);
     end
-    maxnum = floor(maxsize / (dim * 4));
+    maxnum = floor(maxsize / (dim * 4 * factor));
     
     
     % Find the positive examples
@@ -34,13 +38,28 @@ else
     data = [posdata negdata]';
     labels = [ones(numpos,1); -ones(numneg,1)];
     ids = [posids; negids];
+    
+    if model.wta.iswta == 1
+        oridata = data;
+        [data, model.wta.Theta] = ...
+            wtahash(data, model.wta.k, model.wta.m, [], model.wta.iswta);
+        wta = model.wta;
+    end
+    
  
     % Save them in the data file
-    save(datafile, 'data', 'labels', 'ids');
+    save(datafile, 'data', 'labels', 'ids', 'wta');
+    %save(datafile, 'data', 'labels', 'ids');
+else
+    load(datafile)
+    model.wta = wta;
 end
 
 params.c = 0.002;
-model.wta.params.iswta = 0;
+%model.wta.iswta = 1;
+%if model.wta.iswta == 1
+%    data = wtahash(data, model.wta.k, model.wta.m, model.wta.Theta, model.wta.iswta);
+%end
 
 % train the final model based on the best parameters
 model = trainlinear(labels, data, params, model);

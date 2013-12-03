@@ -11,11 +11,9 @@ num = 0;
 
 data = zeros(prod([model.rootfilters{ridx}.size(1) width1 31]), numneg*rndneg);
 ids = cell(numneg*rndneg,1);
-tic;
 for i = 1:numneg
-  if toc > 1
+  if mod(i,100) == 0
     fprintf('%s: random negatives: %d/%d\n', name, i, numneg);
-    tic;
   end
   im = color(imread(neg(i).im));
   feat = features(double(im), model.sbin);  

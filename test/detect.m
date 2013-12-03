@@ -58,7 +58,7 @@ for level = interval+1:length(feat)
   if model.wta.iswta == 0
       rootmatch = fconv(featr, rootfilters, 1, length(rootfilters));
   else
-      rootmatch = wtaconv(featr, [model.maxsize(1) ceil(model.maxsize(2)/2)], model.wta);
+      rootmatch = wtaconv(featr, [model.maxsize(1) ceil(model.maxsize(2)/2)], model);
   end
   
   for c = 1:model.numcomponents

@@ -10,22 +10,12 @@ svmop = '-s 3 -c %f -w1 %f -w-1 %f -B 1';
 wp = sqrt(sum(labels~=1)/sum(labels==1));
 wn = 1;
 
-% nw = ones(length(labels), 1);
-% nw(labels==1) = w1;
-% nw = nw / norm(nw, 2);
-% 
-% a = unique(nw);
-% wp = max(a);
-% wn = min(a);
-
-
-
 op = sprintf(svmop, params.c, wp, wn);
-linearmodel = train(labels, sparse(data), op);
+linearmodel = lineartrain(labels, sparse(data), op);
 
 % predict all
 op = sprintf('-b 0');
-[~,~,vals] = predict(labels, sparse(data), linearmodel, op);
+[~,~,vals] = linearpredict(labels, sparse(data), linearmodel, op);
 
 
 % compute threshold for high recall
